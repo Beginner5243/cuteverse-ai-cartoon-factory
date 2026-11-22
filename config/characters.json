@@ -1,0 +1,22 @@
+{
+  "char_a": {
+    "id": "char_a",
+    "name": "Momo",
+    "archetype": "Fluffy baby animal with oversized eyes and blue scarf",
+    "primary_color": "#F6E7D8",
+    "secondary_color": "#B86B35",
+    "accent_color": "#4EA8DE",
+    "personality": "Innocent, emotional, mischievous, dramatic",
+    "reference_image": "assets/characters/char_a_ref.png"
+  },
+  "char_b": {
+    "id": "char_b",
+    "name": "Tofu-ji",
+    "archetype": "Playful anthropomorphic purple-and-cream sprout veggie with orange headband",
+    "primary_color": "#7B4B94",
+    "secondary_color": "#F7F3E9",
+    "accent_color": "#FF7B00",
+    "personality": "Smart, theatrical, trap-building, comical",
+    "reference_image": "assets/characters/char_b_ref.png"
+  }
+}
