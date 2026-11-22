@@ -12,6 +12,7 @@ from src.character_manager import ensure_character_references, load_characters
 from src.image_generator import generate_scene_backdrop
 from src.quality_checker import run_quality_checks
 from src.story_generator import generate_episode_package, write_script_and_storyboard
+from src.subtitle_generator import generate_srt_subtitles
 from src.video_generator import attempt_remote_video_generation
 from src.video_renderer import concatenate_and_burn_subtitles, generate_thumbnail, render_scene_clip
 from src.voice_generator import generate_scene_voice
@@ -40,7 +41,9 @@ def main() -> int:
         settings = json.loads((repo_root / "config" / "settings.json").read_text(encoding="utf-8"))
         characters = load_characters(repo_root / "config" / "characters.json")
 
-        duration = args.duration if args.duration in settings["video"]["allowed_durations_sec"] else settings["video"]["default_duration_sec"]
+        allowed_durations = settings["video"]["allowed_durations_sec"]
+        default_duration = settings["video"]["default_duration_sec"]
+        duration = args.duration if args.duration in allowed_durations else default_duration
         width = int(settings["video"]["width"])
         height = int(settings["video"]["height"])
         fps = int(settings["video"]["fps"])
@@ -51,7 +54,11 @@ def main() -> int:
             duration_sec=duration,
             characters_data=characters,
         )
-        write_script_and_storyboard(pkg, repo_root / "episodes" / "scripts", repo_root / "episodes" / "storyboards")
+        write_script_and_storyboard(
+            pkg,
+            repo_root / "episodes" / "scripts",
+            repo_root / "episodes" / "storyboards",
+        )
         ref_images = ensure_character_references(characters, repo_root)
 
         work_dir = repo_root / "output" / "work" / f"ep_{args.episode:03d}_{args.language}"
@@ -63,6 +70,7 @@ def main() -> int:
         clip_paths: list[Path] = []
         voice_wavs: list[Path] = []
         first_frame: Path | None = None
+        fallback_thumb_source: Path | None = None
 
         for sc in pkg["scenes"]:
             s_num = sc["scene_number"]
@@ -84,6 +92,8 @@ def main() -> int:
                 width=width,
                 height=height,
             )
+            if fallback_thumb_source is None:
+                fallback_thumb_source = backdrop
 
             remote_clip = attempt_remote_video_generation(
                 scene=sc,
@@ -123,7 +133,10 @@ def main() -> int:
         )
 
         stem = f"ep_{args.episode:03d}_{args.language}"
-        srt_path = generate_srt_subtitles(pkg["scenes"], repo_root / "output" / "subtitles" / f"{stem}.srt")
+        srt_path = generate_srt_subtitles(
+            pkg["scenes"],
+            repo_root / "output" / "subtitles" / f"{stem}.srt",
+        )
         final_mp4 = concatenate_and_burn_subtitles(
             clip_paths=clip_paths,
             mixed_audio_path=mixed_audio,
@@ -134,9 +147,10 @@ def main() -> int:
             fps=fps,
         )
 
+        thumb_source = first_frame or fallback_thumb_source
         thumb_path = repo_root / "output" / "thumbnails" / f"{stem}.jpg"
-        if first_frame:
-            generate_thumbnail(first_frame, pkg["title"], thumb_path, width=width, height=height)
+        if thumb_source:
+            generate_thumbnail(thumb_source, pkg["title"], thumb_path, width=width, height=height)
 
         report_path = repo_root / "output" / "reports" / f"{stem}_quality.json"
         report = run_quality_checks(
@@ -161,4 +175,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-          
+        
