@@ -1,31 +1,38 @@
 from __future__ import annotations
 
 import asyncio
-import math
-import struct
+import logging
+import subprocess
 import wave
 from pathlib import Path
 from typing import Any
 
 import edge_tts
 
+logger = logging.getLogger("cuteverse.voice_generator")
 
-def _generate_fallback_tone_wav(wav_path: Path, duration_sec: float, pitch_hz: float = 240.0) -> Path:
+
+def _probe_wav_duration(wav_path: Path) -> float:
+    if not wav_path.exists():
+        return 0.0
+    try:
+        with wave.open(str(wav_path), "rb") as wf:
+            fr = wf.getframerate()
+            nf = wf.getnframes()
+            return (nf / fr) if fr > 0 else 0.0
+    except Exception:
+        return 0.0
+
+
+def _write_silent_wav(wav_path: Path, duration_sec: float) -> Path:
     wav_path.parent.mkdir(parents=True, exist_ok=True)
     sample_rate = 24000
-    n_samples = max(1, int(sample_rate * duration_sec))
+    n_samples = max(1, int(sample_rate * max(0.5, duration_sec)))
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
-        frames = bytearray()
-        for i in range(n_samples):
-            t = i / sample_rate
-            # Syllabic modulation so mouth animation still moves if TTS falls back
-            syllable_env = 0.5 + 0.5 * math.sin(2 * math.pi * 4.5 * t)
-            val = int(4500 * syllable_env * math.sin(2 * math.pi * pitch_hz * t))
-            frames.extend(struct.pack("<h", max(-32767, min(32767, val))))
-        wf.writeframes(bytes(frames))
+        wf.writeframes(b"\x00\x00" * n_samples)
     return wav_path
 
 
@@ -40,26 +47,61 @@ def generate_scene_voice(
     output_wav: Path,
     duration_sec: float,
     speaker_id: str,
-) -> Path:
+) -> dict[str, Any]:
+    """
+    Synthesizes speech via edge-tts and converts MP3 -> PCM WAV.
+    Never claims voiced success when TTS fails; explicitly reports status and reason.
+    """
     output_wav.parent.mkdir(parents=True, exist_ok=True)
     mp3_temp = output_wav.with_suffix(".mp3")
+
     try:
         asyncio.run(_synthesize_edge_tts(text, voice, mp3_temp))
-        if mp3_temp.exists() and mp3_temp.stat().st_size > 0:
-            # Convert to standard PCM WAV via ffmpeg if available, else keep mp3 rename
-            import subprocess
-            res = subprocess.run(
-                ["ffmpeg", "-y", "-i", str(mp3_temp), "-ar", "24000", "-ac", "1", str(output_wav)],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if res.returncode == 0 and output_wav.exists() and output_wav.stat().st_size > 0:
-                mp3_temp.unlink(missing_ok=True)
-                return output_wav
-    except Exception:
-        pass
+        if not mp3_temp.exists() or mp3_temp.stat().st_size == 0:
+            raise RuntimeError("edge-tts returned empty MP3 file")
 
-    pitch = 290.0 if speaker_id == "char_a" else 195.0
-    return _generate_fallback_tone_wav(output_wav, duration_sec=duration_sec, pitch_hz=pitch)
-  
+        conv = subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", str(mp3_temp),
+                "-ar", "24000",
+                "-ac", "1",
+                "-c:a", "pcm_s16le",
+                str(output_wav),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        mp3_temp.unlink(missing_ok=True)
+
+        if conv.returncode != 0 or not output_wav.exists() or output_wav.stat().st_size <= 44:
+            raise RuntimeError(f"FFmpeg MP3->WAV conversion failed: {conv.stderr.strip()}")
+
+        spoken_dur = _probe_wav_duration(output_wav)
+        return {
+            "wav_path": output_wav,
+            "voiced_ok": True,
+            "fallback_used": False,
+            "voice": voice,
+            "speaker_id": speaker_id,
+            "spoken_duration_sec": round(spoken_dur, 3),
+            "target_duration_sec": round(duration_sec, 3),
+            "error": None,
+        }
+    except Exception as exc:
+        mp3_temp.unlink(missing_ok=True)
+        err_msg = f"TTS failed for speaker={speaker_id} voice={voice}: {exc}"
+        logger.warning(err_msg)
+        _write_silent_wav(output_wav, duration_sec)
+        return {
+            "wav_path": output_wav,
+            "voiced_ok": False,
+            "fallback_used": True,
+            "voice": voice,
+            "speaker_id": speaker_id,
+            "spoken_duration_sec": 0.0,
+            "target_duration_sec": round(duration_sec, 3),
+            "error": err_msg,
+        }
+        
