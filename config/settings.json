@@ -1,0 +1,39 @@
+{
+  "project_name": "CUTEVERSE AI CARTOON FACTORY",
+  "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "codec": "libx264",
+    "pixel_format": "yuv420p",
+    "default_duration_sec": 30,
+    "allowed_durations_sec": [30, 45, 90]
+  },
+  "languages": {
+    "en": {
+      "name": "English",
+      "voice_char_a": "en-IN-NeerjaNeural",
+      "voice_char_b": "en-IN-PrabhatNeural"
+    },
+    "hi": {
+      "name": "Hindi",
+      "voice_char_a": "hi-IN-SwaraNeural",
+      "voice_char_b": "hi-IN-MadhurNeural"
+    },
+    "gu": {
+      "name": "Gujarati",
+      "voice_char_a": "gu-IN-DhwaniNeural",
+      "voice_char_b": "gu-IN-NiranjanNeural"
+    }
+  },
+  "remote_video": {
+    "enabled": false,
+    "provider": "none",
+    "timeout_sec": 20,
+    "max_retries": 2
+  },
+  "auto_publish": {
+    "enabled": false,
+    "requires_manual_approval": true
+  }
+}
