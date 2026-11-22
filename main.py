@@ -28,7 +28,9 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent
     log_dir = repo_root / "output" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"ep_{args.episode:03d}_{args.language}.log"
+    stem = f"ep_{args.episode:03d}_{args.language}"
+    log_file = log_dir / f"{stem}.log"
+    error_report_path = repo_root / "output" / "reports" / f"{stem}_error.json"
 
     logging.basicConfig(
         level=logging.INFO,
@@ -41,9 +43,9 @@ def main() -> int:
         settings = json.loads((repo_root / "config" / "settings.json").read_text(encoding="utf-8"))
         characters = load_characters(repo_root / "config" / "characters.json")
 
-        allowed_durations = settings["video"]["allowed_durations_sec"]
-        default_duration = settings["video"]["default_duration_sec"]
-        duration = args.duration if args.duration in allowed_durations else default_duration
+        allowed = settings["video"]["allowed_durations_sec"]
+        default_dur = settings["video"]["default_duration_sec"]
+        duration = int(args.duration) if int(args.duration) in allowed else int(default_dur)
         width = int(settings["video"]["width"])
         height = int(settings["video"]["height"])
         fps = int(settings["video"]["fps"])
@@ -54,14 +56,10 @@ def main() -> int:
             duration_sec=duration,
             characters_data=characters,
         )
-        write_script_and_storyboard(
-            pkg,
-            repo_root / "episodes" / "scripts",
-            repo_root / "episodes" / "storyboards",
-        )
+        write_script_and_storyboard(pkg, repo_root / "episodes" / "scripts", repo_root / "episodes" / "storyboards")
         ref_images = ensure_character_references(characters, repo_root)
 
-        work_dir = repo_root / "output" / "work" / f"ep_{args.episode:03d}_{args.language}"
+        work_dir = repo_root / "output" / "work" / stem
         if work_dir.exists():
             shutil.rmtree(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -69,6 +67,7 @@ def main() -> int:
         lang_cfg = settings["languages"][args.language]
         clip_paths: list[Path] = []
         voice_wavs: list[Path] = []
+        tts_records: list[dict] = []
         first_frame: Path | None = None
         fallback_thumb_source: Path | None = None
 
@@ -77,14 +76,15 @@ def main() -> int:
             speaker_id = sc["speaker_id"]
             voice_name = lang_cfg["voice_char_a"] if speaker_id == "char_a" else lang_cfg["voice_char_b"]
 
-            voice_wav = generate_scene_voice(
+            tts_info = generate_scene_voice(
                 text=sc["dialogue"],
                 voice=voice_name,
                 output_wav=work_dir / f"voice_{s_num:02d}.wav",
                 duration_sec=float(sc["duration_sec"]),
                 speaker_id=speaker_id,
             )
-            voice_wavs.append(voice_wav)
+            tts_records.append(tts_info)
+            voice_wavs.append(Path(tts_info["wav_path"]))
 
             backdrop = generate_scene_backdrop(
                 scene=sc,
@@ -109,18 +109,20 @@ def main() -> int:
                     scene=sc,
                     backdrop_path=backdrop,
                     ref_images=ref_images,
-                    audio_wav_path=voice_wav,
+                    audio_wav_path=Path(tts_info["wav_path"]),
                     frames_dir=work_dir / f"frames_{s_num:02d}",
                     width=width,
                     height=height,
                     fps=fps,
+                    spoken_duration_sec=tts_info.get("spoken_duration_sec"),
                 )
                 if first_frame is None and frames:
                     first_frame = frames[0]
                 clip_mp4 = render_scene_clip(
                     frame_paths=frames,
-                    audio_wav_path=voice_wav,
+                    audio_wav_path=Path(tts_info["wav_path"]),
                     clip_mp4_path=work_dir / f"clip_{s_num:02d}.mp4",
+                    duration_sec=float(sc["duration_sec"]),
                     fps=fps,
                 )
                 clip_paths.append(clip_mp4)
@@ -132,16 +134,14 @@ def main() -> int:
             total_duration_sec=float(duration),
         )
 
-        stem = f"ep_{args.episode:03d}_{args.language}"
-        srt_path = generate_srt_subtitles(
-            pkg["scenes"],
-            repo_root / "output" / "subtitles" / f"{stem}.srt",
-        )
+        srt_path = generate_srt_subtitles(pkg["scenes"], repo_root / "output" / "subtitles" / f"{stem}.srt")
         final_mp4 = concatenate_and_burn_subtitles(
             clip_paths=clip_paths,
             mixed_audio_path=mixed_audio,
             srt_path=srt_path,
             final_mp4_path=repo_root / "output" / "videos" / f"{stem}.mp4",
+            total_duration_sec=float(duration),
+            language=args.language,
             width=width,
             height=height,
             fps=fps,
@@ -150,9 +150,10 @@ def main() -> int:
         thumb_source = first_frame or fallback_thumb_source
         thumb_path = repo_root / "output" / "thumbnails" / f"{stem}.jpg"
         if thumb_source:
-            generate_thumbnail(thumb_source, pkg["title"], thumb_path, width=width, height=height)
+            generate_thumbnail(thumb_source, pkg["title"], thumb_path, language=args.language, width=width, height=height)
 
         report_path = repo_root / "output" / "reports" / f"{stem}_quality.json"
+        preview_dir = repo_root / "output" / "reports" / f"{stem}_previews"
         report = run_quality_checks(
             mp4_path=final_mp4,
             srt_path=srt_path,
@@ -161,18 +162,26 @@ def main() -> int:
             expected_width=width,
             expected_height=height,
             report_path=report_path,
+            ref_images=list(ref_images.values()),
+            tts_records=tts_records,
+            preview_dir=preview_dir,
         )
-        logger.info("Quality report: %s", json.dumps(report))
+        logger.info("Quality report: %s", json.dumps(report, ensure_ascii=False))
         if not report["passed"]:
+            error_report_path.write_text(json.dumps({"episode": stem, "reason": "Quality gate failed", "report": report}, indent=2, ensure_ascii=False), encoding="utf-8")
             raise RuntimeError(f"Episode failed quality checks: {report}")
 
+        if error_report_path.exists():
+            error_report_path.unlink(missing_ok=True)
         logger.info("Episode completed successfully: %s", final_mp4)
         return 0
     except Exception as exc:
         logger.exception("Pipeline error: %s", exc)
+        error_report_path.parent.mkdir(parents=True, exist_ok=True)
+        error_report_path.write_text(json.dumps({"episode": stem, "error": str(exc)}, indent=2, ensure_ascii=False), encoding="utf-8")
         return 1
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-        
+    
