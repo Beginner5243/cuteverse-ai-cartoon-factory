@@ -8,77 +8,73 @@ from typing import Any
 
 STORY_TEMPLATES: list[dict[str, Any]] = [
     {
-        "title": "The Vanishing Laddoo Trap",
-        "hook_en": "Wait—where did my giant laddoo go?!",
-        "hook_hi": "रुको—मेरा बड़ा लड्डू कहाँ गया?!",
-        "hook_gu": "રોકાઓ—મારો મોટો લાડુ ક્યાં ગયો?!",
-        "twist_en": "Plot twist: the spring-loaded cushion launched BOTH of them!",
-        "twist_hi": "ट्विस्ट: स्प्रिंग वाले कुशन ने दोनों को हवा में उछाल दिया!",
-        "twist_gu": "ટ્વિસ્ટ: સ્પ્રિંગવાળા ગાદીએ બંનેને હવામાં ઉછાળી દીધા!",
-        "ending_en": "Moral: share snacks, or get bounced into next week!",
-        "ending_hi": "सीख: स्नैक्स बाँटो, वरना सीधे हवा में उछलोगे!",
-        "ending_gu": "શીખ: નાસ્તો વહેંચો, નહીંતર સીધા હવામાં ઉછળશો!",
-        "question_en": "Who was more dramatic—Momo or Tofu-ji?",
-        "question_hi": "सबसे ज़्यादा ड्रामेबाज़ कौन था—मोमो या टोफू-जी?",
-        "question_gu": "સૌથી વધુ ડ્રામેબાઝ કોણ હતું—મોમો કે ટોફૂ-જી?",
+        "title": "Sheru and Potato's Bouncing Laddoo Mix-Up",
+        "setting": "kitchen_room",
+        "hook_en": "Hey! That giant laddoo is rolling right toward us!",
+        "hook_hi": "अरे! वो बड़ा लड्डू सीधा हमारी तरफ लुढ़क रहा है!",
+        "hook_gu": "અરે! એ મોટો લાડુ સીધો આપણી તરફ ગબડી રહ્યો છે!",
+        "twist_en": "Twist! Potato caught it, tripped on a cushion, and bounced Sheru into a giggle!",
+        "twist_hi": "ट्विस्ट! पोटैटो ने लपक लिया, कुशन से फिसला और शेरू हँसते-हँसते उछल पड़ा!",
+        "twist_gu": "ટ્વિસ્ટ! પોટેટોએ ઝીલી લીધો, ગાદી પર લપસ્યો અને શેરુ હસતાં-હસતાં ઉછળી પડ્યો!",
+        "ending_en": "Best snack teamwork ever—who laughed louder, Sheru or Potato?",
+        "ending_hi": "सबसे मज़ेदार टीमवर्क—कौन ज़्यादा हँसा, शेरू या पोटैटो?",
+        "ending_gu": "સૌથી મજેદાર ટીમવર્ક—કોણ વધુ હસ્યું, શેરુ કે પોટેટો?",
         "beats": [
-            ("hook", "char_b", "surprised", "walk_in",
-             "Hey! My giant laddoo just vanished!",
-             "अरे! मेरा बड़ा लड्डू अभी-अभी गायब हो गया!",
-             "અરે! મારો મોટો લાડુ હમણાં જ ગાયબ થઈ ગયો!"),
-            ("misunderstanding", "char_a", "innocent", "blink_hop",
-             "Laddoo? What laddoo? I was just counting clouds!",
-             "लड्डू? कौन सा लड्डू? मैं तो बस बादल गिन रहा था!",
-             "લાડુ? કયો લાડુ? હું તો બસ વાદળ ગણતો હતો!"),
-            ("angry_reaction", "char_b", "angry", "dance_stomp",
-             "Your nose has sugar on it, Momo!",
-             "मोमो, तुम्हारी नाक पर शक्कर लगी है!",
-             "મોમો, તારા નાક પર ખાંડ લાગી છે!"),
-            ("trap_setup", "char_b", "happy", "run_bounce",
-             "Time for a super-secret bouncy cushion trap!",
-             "अब चलेगा एक सुपर-सीक्रेट बाउंसी ट्रैप!",
-             "હવે ચાલશે એક સુપર-સિક્રેટ બાઉન્સી ટ્રેપ!"),
-            ("twist_ending", "char_a", "laughing", "jump_spin",
-             "Wheee! Best trampoline ever!",
-             "हीही! ये तो सबसे मज़ेदार ट्रैंपोलिन है!",
-             "હીહી! આ તો સૌથી મજેદાર ટ્રેમ્પોલિન છે!")
+            ("hook_entrance", "char_a", "surprised", "walk_together", "pass_object",
+             "Look Potato! A giant laddoo just rolled in!",
+             "देखो पोटैटो! एक बड़ा लड्डू अंदर आ गया!",
+             "જુઓ પોટેટો! એક મોટો લાડુ અંદર આવી ગયો!"),
+            ("dialogue_exchange", "char_b", "happy", "talk_face_to_face", "hold_object",
+             "Careful Sheru, pass it gently—don't drop my treat!",
+             "संभाल के शेरू, धीरे से दो—मेरी मिठाई गिराना मत!",
+             "સંભાળીને શેરુ, ધીમેથી આપ—મારી મીઠાઈ પાડતો નહીં!"),
+            ("misunderstanding", "char_a", "innocent", "pass_object", "catch_object",
+             "I passed it! Why did you duck like a ninja?",
+             "मैंने तो दे दिया! तुम निंजा की तरह क्यों झुके?",
+             "મેં તો આપી દીધો! તું નિન્જાની જેમ કેમ ઝૂક્યો?"),
+            ("physical_comedy", "char_b", "angry", "run_and_fall", "drop_object",
+             "Whoa—my sprout headband slipped and I tumbled!",
+             "ओह—मेरा हेडबैंड खिसका और मैं लड़खड़ा गया!",
+             "ઓહ—મારું હેડબેન્ડ સરક્યું અને હું ગબડી પડ્યો!"),
+            ("twist_ending", "char_a", "laughing", "laugh_together", "share_object",
+             "Haha! Soft cushion landing! Let's share half and half!",
+             "हाहा! कुशन पर मज़ेदार लैंडिंग! आधा-आधा बाँटते हैं!",
+             "હાહા! ગાદી પર મજેદાર લેન્ડિંગ! અડધો-અડધો વહેંચીએ!")
         ],
     },
     {
-        "title": "The Great Mango Mistake",
-        "hook_en": "Who painted a yellow rock to look like a mango?!",
-        "hook_hi": "आम जैसा दिखने वाला पीला पत्थर किसने रखा?!",
-        "hook_gu": "કેરી જેવો દેખાતો પીળો પથ્થર કોણે મૂક્યો?!",
-        "twist_en": "The 'mango' rolled down and bonked Tofu-ji's own helmet!",
-        "twist_hi": "वो 'आम' लुढ़का और टोफू-जी के ही सिर से टकराया!",
-        "twist_gu": "એ 'કેરી' ગબડી અને ટોફૂ-જીના જ માથા સાથે અથડાઈ!",
-        "ending_en": "Funny ending: real mangoes won the day!",
-        "ending_hi": "मज़ेदार अंत: असली आम ने बाज़ी मार ली!",
-        "ending_gu": "રમુજી અંત: અસલી કેરીએ બાજી મારી લીધી!",
-        "question_en": "Would you fall for Tofu-ji's prank?",
-        "question_hi": "क्या आप टोफू-जी के मज़ाक में फँस जाते?",
-        "question_gu": "શું તમે ટોફૂ-જીની મજાકમાં ફસાઈ જાત?",
+        "title": "The Golden Mango Toss",
+        "setting": "sunny_garden",
+        "hook_en": "Catch! A shiny golden mango just flew over the fence!",
+        "hook_hi": "पकड़ो! बाड़ के ऊपर से चमकता सुनहरा आम आया!",
+        "hook_gu": "પકડો! વાડ ઉપરથી ચમકતી સોનેરી કેરી આવી!",
+        "twist_en": "Twist! It wasn't a heavy rock—it was a bouncy ball that boinged both buddies!",
+        "twist_hi": "ट्विस्ट! वो भारी पत्थर नहीं, उछलती गेंद थी जिसने दोनों को उछाल दिया!",
+        "twist_gu": "ટ્વિસ્ટ! એ ભારે પથ્થર નહીં, ઉછળતો દડો હતો જેણે બંનેને ઉછાળી દીધા!",
+        "ending_en": "Silly garden surprise—would you catch it or dodge it?",
+        "ending_hi": "गार्डन का मज़ेदार सरप्राइज़—आप पकड़ते या बचते?",
+        "ending_gu": "ગાર્ડનની રમુજી સરપ્રાઈઝ—તમે પકડત કે બચત?",
         "beats": [
-            ("hook", "char_a", "surprised", "jump_spin",
-             "Whoa! A super shiny golden mango!",
-             "वाह! एक एकदम चमकता सुनहरा आम!",
-             "વાહ! એકદમ ચમકતી સોનેરી કેરી!"),
-            ("misunderstanding", "char_b", "angry", "walk_in",
-             "That is my lucky paperweight, not a mango!",
-             "वो मेरा लकी पेपरवेट है, आम नहीं!",
-             "એ મારું લકી પેપરવેટ છે, કેરી નહીં!"),
-            ("angry_reaction", "char_a", "crying", "blink_hop",
-             "My teeth almost chipped! So unfair!",
-             "मेरे दाँत टूटते-टूटते बचे! ये गलत है!",
-             "મારા દાંત તૂટતા-તૂટતા બચ્યા! આ ખોટું છે!"),
-            ("trap_setup", "char_b", "laughing", "run_bounce",
-             "Watch this silly rolling decoy trick!",
-             "देखो ये मज़ेदार लुढ़कने वाली चाल!",
-             "જુઓ આ રમુજી ગબડતી ચાલ!"),
-            ("twist_ending", "char_a", "happy", "dance_stomp",
-             "Surprise! Real mangoes for everyone!",
-             "सरप्राइज़! सबके लिए असली आम!",
-             "સરપ્રાઈઝ! બધા માટે અસલી કેરી!")
+            ("hook_entrance", "char_b", "surprised", "walk_together", "pass_object",
+             "Sheru! Quick! Catch this golden mango!",
+             "शेरू! जल्दी! इस सुनहरे आम को पकड़ो!",
+             "શેરુ! જલ્દી! આ સોનેરી કેરી પકડો!"),
+            ("dialogue_exchange", "char_a", "happy", "talk_face_to_face", "catch_object",
+             "Got it! Wait—why does this mango bounce like rubber?",
+             "पकड़ लिया! रुको—ये आम रबर जैसा क्यों उछल रहा है?",
+             "પકડી લીધી! રોકાઓ—આ કેરી રબર જેવી કેમ ઉછળે છે?"),
+            ("misunderstanding", "char_b", "innocent", "pass_object", "catch_object",
+             "Maybe mangoes do yoga in the afternoon sun!",
+             "शायद दोपहर की धूप में आम भी योग करते हैं!",
+             "કદાચ બપોરના તડકામાં કેરી પણ યોગ કરે છે!"),
+            ("physical_comedy", "char_a", "surprised", "run_and_fall", "drop_object",
+             "Boing! Too bouncy—I'm doing a cartoon flip!",
+             "बोइंग! ज़्यादा उछल गया—मैं तो पलटी खा गया!",
+             "બોઇંગ! વધુ ઉછળી ગઈ—હું તો ગબડી પડ્યો!"),
+            ("twist_ending", "char_b", "laughing", "laugh_together", "share_object",
+             "Haha! Real sweet mangoes are waiting in the basket!",
+             "हाहा! टोकरी में असली मीठे आम रखे हैं!",
+             "હાહા! ટોપલીમાં અસલી મીઠી કેરીઓ રાખી છે!")
         ],
     },
 ]
@@ -92,7 +88,7 @@ def generate_episode_package(
     seed: int | None = None,
 ) -> dict[str, Any]:
     lang = language if language in ("en", "hi", "gu") else "en"
-    rng = random.Random(seed if seed is not None else episode_id * 97 + len(lang))
+    rng = random.Random(seed if seed is not None else episode_id * 131 + len(lang))
     template = STORY_TEMPLATES[(episode_id - 1) % len(STORY_TEMPLATES)]
 
     beats = template["beats"]
@@ -102,42 +98,38 @@ def generate_episode_package(
     hook_key = f"hook_{lang}"
     twist_key = f"twist_{lang}"
     ending_key = f"ending_{lang}"
-    question_key = f"question_{lang}"
-    line_idx = {"en": 4, "hi": 5, "gu": 6}[lang]
+    line_idx = {"en": 5, "hi": 6, "gu": 7}[lang]
 
     scenes: list[dict[str, Any]] = []
     current_t = 0.0
 
     for idx, beat in enumerate(beats, start=1):
-        beat_name, speaker_id, expression, motion, *_ = beat
+        beat_name, speaker_id, expression, action, prop_action, *_ = beat
         dialogue_text = beat[line_idx]
         if idx == 1:
             dialogue_text = template[hook_key]
         elif idx == num_scenes:
-            dialogue_text = f"{template[ending_key]} {template[question_key]}"
+            dialogue_text = template[ending_key]
 
         scene_dur = round(base_len if idx < num_scenes else max(2.0, duration_sec - current_t), 2)
         speaker_name = characters_data[speaker_id]["name"]
-        other_id = "char_b" if speaker_id == "char_a" else "char_a"
-        other_name = characters_data[other_id]["name"]
+        listener_id = "char_b" if speaker_id == "char_a" else "char_a"
+        listener_name = characters_data[listener_id]["name"]
 
         scenes.append({
             "scene_number": idx,
             "beat": beat_name,
+            "setting": template["setting"],
             "start_sec": round(current_t, 2),
             "duration_sec": scene_dur,
             "speaker_id": speaker_id,
             "speaker_name": speaker_name,
-            "listener_id": other_id,
-            "listener_name": other_name,
+            "listener_id": listener_id,
+            "listener_name": listener_name,
             "expression": expression,
-            "motion": motion,
+            "action": action,
+            "prop_action": prop_action,
             "dialogue": dialogue_text,
-            "visual_prompt": (
-                f"Cute expressive 3D cartoon style, {speaker_name} and {other_name} in a bright "
-                f"playful room, {beat_name} moment, {expression} reaction, {motion} action, "
-                f"consistent character design, vibrant lighting, no watermark."
-            ),
             "camera_move": rng.choice(["zoom_in", "pan_right", "pan_left", "gentle_bounce"]),
         })
         current_t += scene_dur
@@ -145,27 +137,30 @@ def generate_episode_package(
     script_lines = [
         f"TITLE: {template['title']} (Episode {episode_id})",
         f"LANGUAGE: {lang.upper()}",
+        f"SETTING: {template['setting']}",
         f"TARGET DURATION: {duration_sec}s",
-        f"OPENING HOOK: {template[hook_key]}",
+        f"HOOK: {template[hook_key]}",
         f"TWIST: {template[twist_key]}",
-        "-" * 48,
+        f"ENDING: {template[ending_key]}",
+        "=" * 48,
     ]
     for sc in scenes:
         script_lines.append(
             f"[Scene {sc['scene_number']} | {sc['start_sec']}s - "
-            f"{round(sc['start_sec'] + sc['duration_sec'], 2)}s | {sc['motion']} | {sc['expression']}]\n"
+            f"{round(sc['start_sec'] + sc['duration_sec'], 2)}s | action={sc['action']} | "
+            f"prop={sc['prop_action']} | expr={sc['expression']}]\n"
             f"{sc['speaker_name']}: {sc['dialogue']}\n"
         )
 
     return {
         "episode_id": episode_id,
         "title": template["title"],
+        "setting": template["setting"],
         "language": lang,
         "duration_sec": duration_sec,
         "hook": template[hook_key],
         "twist": template[twist_key],
         "ending": template[ending_key],
-        "engagement_question": template[question_key],
         "scenes": scenes,
         "script_text": "\n".join(script_lines),
     }
@@ -186,4 +181,4 @@ def write_script_and_storyboard(
     script_path.write_text(package["script_text"], encoding="utf-8")
     storyboard_path.write_text(json.dumps(package, indent=2, ensure_ascii=False), encoding="utf-8")
     return script_path, storyboard_path
-  
+    
