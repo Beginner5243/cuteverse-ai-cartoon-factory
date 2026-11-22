@@ -41,9 +41,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install FFmpeg and dependencies
+      - name: Install FFmpeg, Noto Indic fonts, and Python dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
+          sudo apt-get update && sudo apt-get install -y \
+            ffmpeg \
+            fonts-noto-core \
+            fonts-noto-devanagari \
+            fonts-noto-gujarati
+          fc-cache -f -v
           pip install --upgrade pip
           pip install -r requirements.txt
 
