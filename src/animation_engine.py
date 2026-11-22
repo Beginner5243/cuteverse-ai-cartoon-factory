@@ -5,24 +5,25 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
+
+from src.character_manager import extract_articulated_parts
 
 
 def _get_audio_amplitudes(wav_path: Path, fps: int, total_frames: int) -> list[float]:
     if not wav_path.exists():
-        return [0.3 if (i % 10 < 5) else 0.05 for i in range(total_frames)]
+        return [0.0] * total_frames
     try:
         with wave.open(str(wav_path), "rb") as wf:
             n_frames = wf.getnframes()
-            sample_rate = wf.getframerate()
-            n_channels = wf.getnchannels()
+            n_channels = max(1, wf.getnchannels())
             sampwidth = wf.getsampwidth()
             raw = wf.readframes(n_frames)
-        if n_frames == 0 or sample_rate == 0 or sampwidth != 2:
-            return [0.2] * total_frames
+        if n_frames == 0 or sampwidth != 2:
+            return [0.0] * total_frames
         samples = [
             int.from_bytes(raw[i:i + 2], byteorder="little", signed=True)
-            for i in range(0, len(raw), 2 * max(1, n_channels))
+            for i in range(0, len(raw), 2 * n_channels)
         ]
         peak = max((abs(s) for s in samples), default=1) or 1
         amps: list[float] = []
@@ -30,41 +31,133 @@ def _get_audio_amplitudes(wav_path: Path, fps: int, total_frames: int) -> list[f
         for f in range(total_frames):
             chunk = samples[f * samples_per_frame:(f + 1) * samples_per_frame]
             avg = (sum(abs(x) for x in chunk) / max(1, len(chunk))) / peak
-            amps.append(min(1.0, avg * 2.2))
+            amps.append(min(1.0, avg * 2.4))
         return amps
     except Exception:
-        return [0.25 if (i % 12 < 6) else 0.05 for i in range(total_frames)]
+        return [0.0] * total_frames
 
 
-def _draw_expression_and_mouth(
-    draw: ImageDraw.ImageDraw,
-    cx: int,
-    mouth_y: int,
+def _draw_articulated_character(
+    canvas: Image.Image,
+    parts: dict[str, Image.Image],
+    x: int,
+    y: int,
+    scale: float,
+    phase: float,
+    head_tilt: float,
+    mouth_open_amount: float,
     expression: str,
-    mouth_open: float,
     blink: bool,
-    eye_y: int,
-    eye_offset_x: int,
-) -> None:
-    # Blinking or expression eyes
-    for side in (-1, 1):
-        ex = cx + side * eye_offset_x
-        if blink:
-            draw.line([(ex - 18, eye_y), (ex + 18, eye_y)], fill="#111111", width=4)
-        elif expression == "angry":
-            draw.line([(ex - 20, eye_y - 14), (ex + 16, eye_y - 2)], fill="#B71C1C", width=5)
-        elif expression == "crying":
-            draw.ellipse([ex - 6, eye_y + 18, ex + 6, eye_y + 34], fill="#29B6F6")
+    is_speaker: bool,
+) -> tuple[int, int, int, int]:
+    """
+    Renders separated legs, arms, body, and head with articulation,
+    dialogue timing + amplitude mouth motion, and expression overlays.
+    Returns bounding box (x0, y0, x1, y1).
+    """
+    stride = math.sin(phase * math.pi * 4)
+    leg_swing_l = 18 * stride
+    leg_swing_r = -18 * stride
+    arm_swing_l = -22 * stride if is_speaker else -10 * stride
+    arm_swing_r = 22 * stride if is_speaker else 10 * stride
+    bob_y = -abs(math.cos(phase * math.pi * 4)) * 14
 
-    # Mouth driven by speech amplitude + expression
-    open_h = int(6 + mouth_open * 26)
-    if expression == "crying":
-        draw.arc([cx - 26, mouth_y, cx + 26, mouth_y + 28], start=180, end=360, fill="#222222", width=4)
-    elif open_h > 9 or expression in ("surprised", "laughing"):
-        draw.ellipse([cx - 22, mouth_y - open_h // 2, cx + 22, mouth_y + open_h // 2],
-                     fill="#D32F2F", outline="#222222", width=3)
+    def resize_part(name: str, w_base: int, h_base: int) -> Image.Image:
+        return parts[name].resize(
+            (max(1, int(w_base * scale)), max(1, int(h_base * scale))),
+            Image.Resampling.LANCZOS,
+        )
+
+    leg_l = resize_part("left_leg", 68, 66).rotate(leg_swing_l, expand=True, resample=Image.BICUBIC)
+    leg_r = resize_part("right_leg", 68, 66).rotate(leg_swing_r, expand=True, resample=Image.BICUBIC)
+    arm_l = resize_part("left_arm", 68, 72).rotate(arm_swing_l, expand=True, resample=Image.BICUBIC)
+    arm_r = resize_part("right_arm", 68, 72).rotate(arm_swing_r, expand=True, resample=Image.BICUBIC)
+    body = resize_part("body", 165, 112)
+    head = resize_part("head", 220, 205).rotate(head_tilt, expand=True, resample=Image.BICUBIC)
+
+    cur_y = int(y + bob_y)
+    body_x = x + int(28 * scale)
+    body_y = cur_y + int(155 * scale)
+    leg_y = body_y + int(82 * scale)
+
+    canvas.alpha_composite(leg_l, (body_x + int(8 * scale), leg_y))
+    canvas.alpha_composite(leg_r, (body_x + int(82 * scale), leg_y))
+    canvas.alpha_composite(arm_l, (body_x - int(36 * scale), body_y + int(8 * scale)))
+    canvas.alpha_composite(arm_r, (body_x + int(132 * scale), body_y + int(8 * scale)))
+    canvas.alpha_composite(body, (body_x, body_y))
+
+    head_x = x + int(4 * scale) + int(head_tilt * 0.6)
+    head_y = cur_y
+    canvas.alpha_composite(head, (head_x, head_y))
+
+    draw = ImageDraw.Draw(canvas)
+    h_cx = head_x + head.width // 2
+    h_cy = head_y + head.height // 2
+
+    # Brows & emotion cues on head
+    for side in (-1, 1):
+        ex = h_cx + side * int(34 * scale)
+        ey = h_cy - int(12 * scale)
+        if blink:
+            draw.line([(ex - 14, ey), (ex + 14, ey)], fill="#1A1A1A", width=3)
+        elif expression == "angry":
+            draw.line([(ex - 16, ey - 22), (ex + 12, ey - 12)], fill="#B71C1C", width=4)
+        elif expression == "surprised":
+            draw.arc([ex - 14, ey - 30, ex + 14, ey - 14], start=180, end=360, fill="#1A1A1A", width=3)
+        elif expression == "crying":
+            draw.ellipse([ex - 4, ey + 14, ex + 4, ey + 26], fill="#29B6F6")
+
+    # Mouth driven by dialogue timing envelope + speech amplitude
+    mouth_y = h_cy + int(34 * scale)
+    m_open = int(4 + mouth_open_amount * 20)
+    if mouth_open_amount > 0.14 or expression in ("surprised", "laughing"):
+        draw.ellipse(
+            [h_cx - int(18 * scale), mouth_y - m_open // 2, h_cx + int(18 * scale), mouth_y + m_open // 2],
+            fill="#C62828",
+            outline="#1A1A1A",
+            width=3,
+        )
     else:
-        draw.arc([cx - 24, mouth_y - 8, cx + 24, mouth_y + 12], start=15, end=165, fill="#222222", width=4)
+        draw.arc(
+            [h_cx - int(20 * scale), mouth_y - 6, h_cx + int(20 * scale), mouth_y + 10],
+            start=12,
+            end=168,
+            fill="#1A1A1A",
+            width=3,
+        )
+
+    x1 = max(x + body_x - int(36 * scale), x)
+    y1 = leg_y + leg_l.height
+    return (min(x, body_x - int(36 * scale)), head_y, max(head_x + head.width, body_x + int(132 * scale) + arm_r.width), y1)
+
+
+def _draw_prop(
+    canvas: Image.Image,
+    setting: str,
+    prop_action: str,
+    progress: float,
+    ax: int,
+    bx: int,
+    y_base: int,
+) -> None:
+    if prop_action == "drop_object" and progress > 0.45:
+        return
+    draw = ImageDraw.Draw(canvas)
+    t_arc = math.sin(progress * math.pi)
+    px = int(ax + (bx - ax) * progress)
+    py = int(y_base + 120 - t_arc * 160)
+    if prop_action == "share_object":
+        px = (ax + bx) // 2 + 60
+        py = y_base + 140
+
+    if setting == "sunny_garden":
+        # Golden mango prop
+        draw.ellipse([px - 28, py - 22, px + 28, py + 24], fill="#FFB300", outline="#E65100", width=3)
+        draw.polygon([(px, py - 22), (px + 14, py - 34), (px + 18, py - 18)], fill="#43A047")
+    else:
+        # Sweet laddoo prop
+        draw.ellipse([px - 26, py - 26, px + 26, py + 26], fill="#FFA000", outline="#795548", width=3)
+        draw.point([(px - 6, py - 5), (px + 7, py + 4), (px + 4, py - 8)], fill="#FFF8E1")
 
 
 def render_animated_scene_frames(
@@ -76,114 +169,114 @@ def render_animated_scene_frames(
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
+    spoken_duration_sec: float | None = None,
 ) -> list[Path]:
     frames_dir.mkdir(parents=True, exist_ok=True)
-    total_frames = max(15, int(round(scene["duration_sec"] * fps)))
+    duration_sec = float(scene["duration_sec"])
+    total_frames = max(15, int(round(duration_sec * fps)))
     amplitudes = _get_audio_amplitudes(audio_wav_path, fps, total_frames)
 
-    base_bg = Image.open(backdrop_path).convert("RGB").resize((width, height))
-    char_a_sprite = Image.open(ref_images["char_a"]).convert("RGBA").resize((360, 360))
-    char_b_sprite = Image.open(ref_images["char_b"]).convert("RGBA").resize((340, 340))
+    parts_a = extract_articulated_parts(ref_images["char_a"])
+    parts_b = extract_articulated_parts(ref_images["char_b"])
+    base_bg = Image.open(backdrop_path).convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
 
-    font = ImageFont.load_default()
-    frame_paths: list[Path] = []
-    motion = scene.get("motion", "walk_in")
+    action = scene.get("action", "walk_together")
     expression = scene.get("expression", "happy")
     speaker_id = scene.get("speaker_id", "char_a")
+    setting = scene.get("setting", "kitchen_room")
+    prop_action = scene.get("prop_action", "pass_object")
+    margin = 60
+    active_speech_end = spoken_duration_sec if spoken_duration_sec and spoken_duration_sec > 0 else duration_sec * 0.85
 
+    frame_paths: list[Path] = []
     for f_idx in range(total_frames):
+        t_sec = f_idx / fps
         progress = f_idx / max(1, total_frames - 1)
         frame = base_bg.copy()
 
-        # Camera movement
         cam_move = scene.get("camera_move", "zoom_in")
         if cam_move == "zoom_in":
-            zoom = 1.0 + 0.06 * progress
+            zoom = 1.0 + 0.035 * progress
             zw, zh = int(width * zoom), int(height * zoom)
-            zoomed = frame.resize((zw, zh))
-            left = (zw - width) // 2
-            top = (zh - height) // 2
-            frame = zoomed.crop((left, top, left + width, top + height))
-        elif cam_move == "pan_right":
-            shift = int(40 * progress)
-            frame = frame.transform((width, height), Image.AFFINE, (1, 0, shift, 0, 1, 0))
+            zoomed = frame.resize((zw, zh), Image.Resampling.BILINEAR)
+            frame = zoomed.crop(((zw - width) // 2, (zh - height) // 2, (zw - width) // 2 + width, (zh - height) // 2 + height))
 
         canvas = frame.convert("RGBA")
-        draw = ImageDraw.Draw(canvas)
 
-        # Motion trajectories
-        bounce = abs(math.sin(progress * math.pi * 4)) * 38
-        hop = abs(math.sin(progress * math.pi * 6)) * 55
-        if motion == "walk_in":
-            ax = int(-120 + 420 * min(1.0, progress * 1.4))
-            ay = int(1120 - bounce * 0.5)
-            bx = 640
-            by = int(1140 - bounce * 0.3)
-        elif motion == "jump_spin":
-            ax = 240 + int(60 * math.sin(progress * math.pi * 2))
-            ay = int(1120 - hop)
-            bx = 650
-            by = int(1140 - bounce * 0.4)
-        elif motion == "run_bounce":
-            ax = 230
-            ay = int(1120 - bounce * 0.6)
-            bx = int(920 - 280 * min(1.0, progress * 1.3))
-            by = int(1140 - hop * 0.8)
-        elif motion == "dance_stomp":
-            ax = 230 + int(25 * math.sin(progress * math.pi * 6))
-            ay = int(1120 - bounce * 0.7)
-            bx = 650 - int(25 * math.sin(progress * math.pi * 6))
-            by = int(1140 - bounce * 0.7)
-        else:
-            ax = 230
-            ay = int(1120 - bounce * 0.4)
-            bx = 650
-            by = int(1140 - bounce * 0.4)
+        if action == "walk_together":
+            ax = int(margin + 140 * progress)
+            bx = int(520 + 110 * progress)
+            ay = 1130
+            by = 1140
+        elif action == "talk_face_to_face":
+            ax = 210
+            bx = 610
+            ay = 1130
+            by = 1140
+        elif action in ("pass_object", "catch_object", "share_object"):
+            ax = 190
+            bx = 620
+            ay = 1130
+            by = 1140
+        elif action == "run_and_fall":
+            ax = int(170 + 180 * min(1.0, progress * 1.3))
+            bx = int(580 + 140 * min(1.0, progress * 1.3))
+            fall_drop = int(90 * max(0.0, (progress - 0.55) / 0.45))
+            ay = 1130 + fall_drop
+            by = 1140 + (fall_drop if speaker_id == "char_b" else 0)
+        else:  # laugh_together
+            ax = 200 + int(18 * math.sin(progress * math.pi * 6))
+            bx = 600 - int(18 * math.sin(progress * math.pi * 6))
+            ay = 1130
+            by = 1140
 
-        # Head tilt / rotation
-        tilt_a = 8 * math.sin(progress * math.pi * 4) if speaker_id == "char_a" else 0
-        tilt_b = 8 * math.sin(progress * math.pi * 4) if speaker_id == "char_b" else 0
-        rot_a = char_a_sprite.rotate(tilt_a, expand=True, resample=Image.BICUBIC)
-        rot_b = char_b_sprite.rotate(tilt_b, expand=True, resample=Image.BICUBIC)
+        ax = max(margin, min(width - 280 - margin, ax))
+        bx = max(margin, min(width - 280 - margin, bx))
 
-        canvas.alpha_composite(rot_a, (ax, ay))
-        canvas.alpha_composite(rot_b, (bx, by))
-
-        # Blink every ~3 seconds
-        blink = (f_idx % (fps * 3)) < 3
+        # Dialogue timing window + speech amplitude for mouth animation
+        in_dialogue = t_sec <= active_speech_end
+        timing_cadence = (0.55 + 0.45 * math.sin(t_sec * 18.0)) if in_dialogue else 0.0
         amp = amplitudes[f_idx] if f_idx < len(amplitudes) else 0.0
 
-        # Expressive mouth & eye overlay on active speaker
-        if speaker_id == "char_a":
-            _draw_expression_and_mouth(
-                draw,
-                cx=ax + rot_a.width // 2,
-                mouth_y=ay + 195,
-                expression=expression,
-                mouth_open=amp,
-                blink=blink,
-                eye_y=ay + 145,
-                eye_offset_x=42,
-            )
-        else:
-            _draw_expression_and_mouth(
-                draw,
-                cx=bx + rot_b.width // 2,
-                mouth_y=by + 190,
-                expression=expression,
-                mouth_open=amp,
-                blink=blink,
-                eye_y=by + 140,
-                eye_offset_x=38,
-            )
+        mouth_a = max(amp, timing_cadence * 0.55) if (speaker_id == "char_a" and in_dialogue) else amp * 0.2
+        mouth_b = max(amp, timing_cadence * 0.55) if (speaker_id == "char_b" and in_dialogue) else amp * 0.2
 
-        # Subtle scene badge at top
-        draw.rounded_rectangle([40, 70, 340, 125], radius=16, fill=(255, 255, 255, 210))
-        draw.text((62, 88), f"SCENE {scene['scene_number']} • {motion.upper()}", fill="#1A1A1A", font=font)
+        head_tilt_a = 10 * math.sin(progress * math.pi * 4) if speaker_id == "char_a" else -4 * math.cos(progress * math.pi * 2)
+        head_tilt_b = -10 * math.sin(progress * math.pi * 4) if speaker_id == "char_b" else 4 * math.cos(progress * math.pi * 2)
+        blink = (f_idx % (fps * 3)) < 3
+
+        _draw_articulated_character(
+            canvas=canvas,
+            parts=parts_a,
+            x=ax,
+            y=ay,
+            scale=1.05,
+            phase=progress,
+            head_tilt=head_tilt_a,
+            mouth_open_amount=mouth_a,
+            expression=expression if speaker_id == "char_a" else "happy",
+            blink=blink,
+            is_speaker=(speaker_id == "char_a"),
+        )
+        _draw_articulated_character(
+            canvas=canvas,
+            parts=parts_b,
+            x=bx,
+            y=by,
+            scale=1.02,
+            phase=progress + 0.15,
+            head_tilt=head_tilt_b,
+            mouth_open_amount=mouth_b,
+            expression=expression if speaker_id == "char_b" else "happy",
+            blink=blink,
+            is_speaker=(speaker_id == "char_b"),
+        )
+
+        _draw_prop(canvas, setting=setting, prop_action=prop_action, progress=progress, ax=ax + 120, bx=bx + 90, y_base=1150)
 
         out_frame = frames_dir / f"frame_{f_idx:04d}.png"
         canvas.convert("RGB").save(out_frame, format="PNG")
         frame_paths.append(out_frame)
 
     return frame_paths
-  
+    
