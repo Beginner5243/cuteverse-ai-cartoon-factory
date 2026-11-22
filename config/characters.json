@@ -1,22 +1,22 @@
 {
   "char_a": {
     "id": "char_a",
-    "name": "Momo",
-    "archetype": "Fluffy baby animal with oversized eyes and blue scarf",
-    "primary_color": "#F6E7D8",
-    "secondary_color": "#B86B35",
-    "accent_color": "#4EA8DE",
-    "personality": "Innocent, emotional, mischievous, dramatic",
+    "name": "Sheru",
+    "archetype": "Cute panda with cream face and body, brown ears, and large expressive eyes",
+    "primary_color": "#F7EBD9",
+    "secondary_color": "#8D5524",
+    "accent_color": "#3A86FF",
+    "personality": "Playful, emotional, curious, expressive",
     "reference_image": "assets/characters/char_a_ref.png"
   },
   "char_b": {
     "id": "char_b",
-    "name": "Tofu-ji",
-    "archetype": "Playful anthropomorphic purple-and-cream sprout veggie with orange headband",
+    "name": "Potato",
+    "archetype": "Round purple-and-cream potato character with green sprout hair, orange headband, large eyes, small arms and legs",
     "primary_color": "#7B4B94",
-    "secondary_color": "#F7F3E9",
+    "secondary_color": "#F7F2E7",
     "accent_color": "#FF7B00",
-    "personality": "Smart, theatrical, trap-building, comical",
+    "personality": "Witty, mischievous, dramatic, quick-reacting",
     "reference_image": "assets/characters/char_b_ref.png"
   }
 }
